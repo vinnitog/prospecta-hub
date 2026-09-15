@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#153c35">
   <title>Prospecta Hub · Relacionamentos que avançam</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/app.js" defer></script>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
   <aside class="sidebar" id="crm-sidebar" hidden>
@@ -20,7 +20,7 @@
       <button data-view="metrics"><span>↗</span> Resultados</button>
       <button data-view="integration"><span>⊙</span> Integração</button>
     </nav>
-    <div class="sidebar-bottom"><span id="account-name"></span><div class="account-actions"><button id="change-password" class="text-button">Minha senha</button><button id="logout" class="text-button">Sair</button></div><span class="status-dot"></span><span id="sidebar-status">Ambiente local</span></div>
+    <div class="sidebar-bottom"><span class="status-dot"></span><span id="sidebar-status">Dados locais</span></div>
   </aside>
   <main id="crm-main" hidden>
     <header class="topbar"><div><span class="eyebrow">PROSPECÇÃO COM CONTEXTO</span><h1 id="page-title">Sua próxima conversa começa aqui.</h1></div><div class="top-actions"><button id="refresh" class="button secondary">↻ Atualizar</button><button id="new-lead" class="button primary">+ Novo lead</button></div></header>
@@ -34,8 +34,6 @@
     <label>Observações internas<textarea name="notes" rows="3" maxlength="5000" placeholder="O que vale lembrar antes da próxima conversa?"></textarea></label>
     <fieldset><legend>Preferências de contato</legend><label class="check"><input name="optIn" type="checkbox"> Tenho autorização registrada para contato por WhatsApp</label><label>Evidência da autorização<input name="optInEvidence" maxlength="500" placeholder="Data e canal em que o contato autorizou"></label><label class="check"><input name="doNotContact" type="checkbox"> Não contatar este lead</label></fieldset>
     <div class="dialog-actions"><span>Atendimento manual · bot desligado</span><button class="button primary" type="submit">Salvar lead</button></div></form></dialog>
-  <dialog id="login-dialog" aria-labelledby="login-title"><form id="login-form"><span class="brand-mark">p.</span><span class="eyebrow">PROSPECTA HUB · ACESSO PRIVADO</span><h2 id="login-title">Entre no seu espaço.</h2><p class="muted">Seus contatos e conversas, em um só lugar.</p><label>Usuário<input id="login-username" required autocomplete="username" maxlength="40" autocapitalize="none" spellcheck="false"></label><label>Senha<input id="login-password" type="password" required autocomplete="current-password" maxlength="128"></label><p id="login-error" class="form-error" role="alert"></p><button class="button primary" type="submit">Entrar</button></form></dialog>
-  <dialog id="password-dialog" aria-labelledby="password-title"><form id="password-form"><span class="eyebrow">SUA CONTA</span><h2 id="password-title">Defina sua senha pessoal.</h2><p class="muted" id="password-description">Troque a senha inicial antes de acessar o CRM.</p><label>Senha atual<input id="current-password" type="password" required autocomplete="current-password" maxlength="128"></label><label>Nova senha<input id="new-password" type="password" required autocomplete="new-password" minlength="12" maxlength="128"></label><label>Confirme a nova senha<input id="confirm-password" type="password" required autocomplete="new-password" minlength="12" maxlength="128"></label><p class="muted">Use pelo menos 12 caracteres.</p><p id="password-error" class="form-error" role="alert"></p><div class="action-row"><button id="password-cancel" class="button secondary" type="button">Voltar</button><button class="button primary" type="submit">Salvar minha senha</button></div></form></dialog>
   <input id="import-file" type="file" accept=".json,application/json" hidden>
 </body>
 </html>

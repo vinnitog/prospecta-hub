@@ -6,10 +6,9 @@ import path from 'node:path';
 import { readConfig } from './config.js';
 import { Store, STAGES, problem } from './store.js';
 import { integrationStatus, receiveWebhook, safeEqual, sendMessage, verifyMetaSignature } from './whatsapp.js';
-import { hashPassword, publicUser, verifyPassword } from './auth.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const assets = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']]]);
+const assets = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']], ['/domain.js', ['domain.js', 'text/javascript']], ['/browser-store.js', ['browser-store.js', 'text/javascript']]]);
 const security = {
   'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
   'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
@@ -25,21 +24,20 @@ async function readJson(req) {
   catch (error) { if (error.status) throw error; throw problem('JSON inválido.'); }
 }
 export function createApp(config, { store = new Store(config.dbPath), fetchImpl = fetch } = {}) {
-  const sessions = new Map(); const attempts = new Map();
+  const sessions = new Map();
   function session(req) {
     const token = /(?:^|;\s*)prospecta_session=([^;]+)/.exec(req.headers.cookie || '')?.[1];
     const value = sessions.get(token);
-    const user = value && store.userById(value.userId);
-    if (!value || value.expires < Date.now() || !user || user.password_version !== value.passwordVersion) { sessions.delete(token); return null; }
-    return { ...value, user, token };
+    if (!value || value.expires < Date.now()) { sessions.delete(token); return null; }
+    return value;
   }
-  function newSession(res, user) {
+  function newSession(res) {
     for (const [key, val] of sessions) if (val.expires < Date.now()) sessions.delete(key);
     if (sessions.size > 100) sessions.delete(sessions.keys().next().value);
     const token = randomBytes(32).toString('hex'); const csrf = randomBytes(24).toString('hex');
-    sessions.set(token, { csrf, userId: user.id, passwordVersion: user.password_version, expires: Date.now() + 8 * 3600000 });
-    res.setHeader('Set-Cookie', `prospecta_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${config.origin.startsWith('https:') ? '; Secure' : ''}`);
-    return { csrf, user: publicUser(user) };
+    sessions.set(token, { csrf, expires: Date.now() + 8 * 3600000 });
+    res.setHeader('Set-Cookie', `prospecta_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800`);
+    return { csrf };
   }
   const server = http.createServer(async (req, res) => {
     const respond = (status, data, type = 'application/json') => { res.writeHead(status, { ...security, 'Content-Type': `${type}; charset=utf-8` }); res.end(type === 'application/json' ? JSON.stringify(data) : data); };
@@ -63,49 +61,17 @@ export function createApp(config, { store = new Store(config.dbPath), fetchImpl 
       if (req.headers.origin && req.headers.origin !== config.origin) throw problem('Origem não autorizada.', 403);
       if (req.headers['sec-fetch-site'] === 'cross-site') throw problem('Origem não autorizada.', 403);
       if (url.pathname === '/api/session') {
-        if (req.method === 'GET') {
-          const current = session(req);
-          if (current) return respond(200, { csrf: current.csrf, user: publicUser(current.user) });
-          return respond(401, { error: 'Entre com seu usuário e senha.' });
-        }
-        if (req.method === 'DELETE') {
-          const current = session(req);
-          if (!current || !safeEqual(req.headers['x-csrf-token'], current.csrf)) throw problem('Sessão inválida.', 403);
-          sessions.delete(current.token);
-          res.setHeader('Set-Cookie', `prospecta_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${config.origin.startsWith('https:') ? '; Secure' : ''}`);
-          return respond(200, { ok: true });
-        }
-        if (req.method !== 'POST') throw problem('Método não permitido.', 405);
-        const ip = req.socket.remoteAddress;
-        for (const [key, val] of attempts) if (val.reset < Date.now()) attempts.delete(key);
-        const limit = attempts.get(ip) || { count: 0, reset: Date.now() + 60000 };
-        if (++limit.count > 10 || attempts.size > 1000) throw problem('Muitas tentativas. Aguarde um minuto.', 429);
-        attempts.set(ip, limit);
-        const input = await readJson(req);
-        const username = typeof input?.username === 'string' ? input.username.trim().toLowerCase().slice(0, 40) : '';
-        const user = store.user(username);
-        if (!await verifyPassword(input?.password, user?.password_hash)) throw problem('Usuário ou senha inválidos.', 401);
-        attempts.delete(ip); store.audit(user.id, 'login'); return respond(200, newSession(res, user));
+        if (req.method !== 'GET') throw problem('Método não permitido.', 405);
+        const current = session(req);
+        return respond(200, current ? { csrf: current.csrf } : newSession(res));
       }
       if (assets.has(url.pathname) && req.method === 'GET') {
         const [file, type] = assets.get(url.pathname); return respond(200, await readFile(path.join(root, 'public', file)), type);
       }
       if (!url.pathname.startsWith('/api/')) throw problem('Página não encontrada.', 404);
       const current = session(req);
-      if (!current) throw problem('Sessão expirada. Entre novamente.', 401);
+      if (!current) throw problem('Sessão local expirada. Recarregue a página.', 401);
       if (!['GET', 'HEAD'].includes(req.method) && !safeEqual(req.headers['x-csrf-token'], current.csrf)) throw problem('Sessão de formulário inválida. Recarregue a página.', 403);
-      if (url.pathname === '/api/account/password' && req.method === 'POST') {
-        const input = await readJson(req);
-        if (!await verifyPassword(input?.currentPassword, current.user.password_hash)) throw problem('Senha atual inválida.', 403);
-        if (input.newPassword === input.currentPassword) throw problem('Escolha uma senha diferente da inicial.');
-        const hash = await hashPassword(input.newPassword);
-        store.changePassword(current.user.id, hash);
-        for (const [key, value] of sessions) if (value.userId === current.user.id) sessions.delete(key);
-        store.audit(current.user.id, 'password_changed');
-        return respond(200, newSession(res, store.userById(current.user.id)));
-      }
-      if (current.user.must_change_password) throw problem('Troque sua senha inicial para acessar os dados.', 403);
-      if (!['GET', 'HEAD'].includes(req.method)) store.audit(current.user.id, req.method, url.pathname);
       if (url.pathname === '/api/state' && req.method === 'GET') return respond(200, { leads: store.list(), metrics: store.metrics(), stages: STAGES, integration: integrationStatus(config.whatsapp), templates: config.whatsapp.templates });
       if (url.pathname === '/api/leads' && req.method === 'POST') return respond(201, store.save(await readJson(req)));
       if (url.pathname === '/api/leads/import' && req.method === 'POST') return respond(200, store.import(await readJson(req)));

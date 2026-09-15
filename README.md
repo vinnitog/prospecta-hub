@@ -1,36 +1,40 @@
 # Prospecta Hub
 
-CRM privado para uma equipe comercial, com código-fonte público. Node.js 24.12+, SQLite e interface web sem dependências npm.
+CRM gratuito, sem login, com dados privados salvos no seu dispositivo e código-fonte público.
 
-## Executar
+## Usar no GitHub Pages
+
+Abra https://vinnitog.github.io/prospecta-hub/. Cadastre leads ou use **Importar JSON** para carregar seu arquivo privado. Leads, pipeline, observações e conversas ficam no armazenamento local do navegador. A aplicação não envia esses dados ao GitHub nem a uma API externa.
+
+Use **Exportar** para salvar um backup privado de leads e histórico. No navegador, **Importar JSON** também restaura o histórico do backup sem duplicar mensagens; leads já existentes não são sobrescritos. Para enviar a base ao sócio, compartilhe o arquivo por um canal privado e importe no navegador dele.
+
+Não há sincronização entre pessoas, navegadores ou computadores. Quem usar o mesmo perfil de navegador terá acesso aos dados. Limpar os dados do site, usar navegação anônima ou perder o dispositivo pode apagar a base; faça backups. As gravações de duas abas são coordenadas e formulários antigos são recusados para evitar sobrescritas.
+
+## Usar o banco local existente
+
+Requer Node.js 24.12+. Sem instalação de dependências:
 
 ```powershell
-npm.cmd run setup:users -- usuario1 usuario2
 .\start.cmd
 ```
 
-O comando cria duas contas distintas, sem sobrescrever usuários existentes. Senhas iniciais aleatórias ficam somente em um arquivo local dentro de `private/`, ignorado pelo Git. Cada usuário troca sua senha no primeiro login. Acesse http://127.0.0.1:4317.
+Abra http://127.0.0.1:4317/. Sem tela de login; sessão técnica automática mantém validação de origem/Host/CSRF. O servidor aceita somente loopback, sem exposição à rede. O banco existente em `data/prospecta.sqlite` é preservado. As antigas contas deixam de ser usadas; nenhum cadastro ou senha é exigido.
 
-As contas compartilham a carteira e a inbox da equipe. Login obrigatório em todos os ambientes; hashes scrypt no banco, cookies HttpOnly/SameSite, sessões de 8 horas, logout, CSRF e limitação de tentativas. A troca de senha revoga as outras sessões da mesma conta. Não há cadastro público. Edições de leads enviam a versão lida para evitar sobrescrever mudanças do sócio.
+Os armazenamentos do Pages e do servidor local são diferentes. Para migrar a carteira, exporte pelo CRM local e importe no Pages. O SQLite continua sendo a cópia original; o backup JSON permite transferir leads e mensagens ao navegador.
 
-## Dados privados
+## O que é publicado
 
-`data/`, `private/`, `output/`, backups, exports, bancos e `.env` ficam fora do Git e do Pages. O repositório não inclui a lista real de leads. Importe contatos por JSON autenticado ou configure um arquivo privado via `PROSPECTA_CONTEXT_PATH`. Os contatos existentes permanecem no banco local, sem serem enviados ao GitHub.
+Somente código-fonte e instruções. `data/`, `private/`, `output/`, backups, exports, bancos e `.env` ficam fora do Git. O artefato do Pages contém somente `index.html`, `styles.css`, `app.js`, `domain.js` e `browser-store.js`. Nenhuma lista real de leads ou credencial é incluída. A política de conteúdo do Pages bloqueia conexões iniciadas pelo aplicativo.
 
-Copie `.env.example` para `.env` se precisar configurar o ambiente. Para backup completo, pare o servidor e copie o banco SQLite para um local privado. O JSON exportado contém leads e histórico; a reimportação recupera somente leads, sem sobrescrever duplicatas.
+O código público já contém exemplos estritamente fictícios nos testes. A auditoria automatizada procura arquivos privados e padrões conhecidos de segredo; revisar o diff continua obrigatório.
 
-## GitHub Pages e servidor
+## WhatsApp
 
-GitHub Pages publica somente o portal estático em `pages/`, montado por `scripts/build-pages.js`. Não executa Node/SQLite nem hospeda os dados do CRM. O portal não solicita senha.
+No Pages, inbox e respostas são apenas simulações locais. Não há webhook nem envio real pela Meta no navegador. Nunca colocar token/app secret em arquivos públicos. A integração do outro projeto permanece preservada; seu número compartilhado continua bloqueado no adaptador local até a solução de roteamento aprovada.
 
-Para acesso remoto dos dois usuários, hospede o servidor separadamente, com volume persistente, `HOST=0.0.0.0` e `PROSPECTA_ORIGIN` HTTPS. Crie as contas no banco desse servidor; não publique os arquivos locais de senha. Configure a variável do repositório `CRM_PUBLIC_URL` com o endereço HTTPS do CRM e execute o workflow **Publish Pages** para ativar o link no portal. Sem essa variável, o portal informa que o acesso está em configuração.
+## Desenvolvimento
 
-## Desenvolvimento e publicação
-
-- Trabalho cotidiano em `develop`.
-- Abrir PR de `develop` para `main` e revisar os checks antes de integrar.
-- GitHub Pages publica a partir de `main` pelo GitHub Actions.
-- O artefato contém somente `index.html` e `styles.css` do portal. Nunca publicar a raiz, `data/`, `private/` ou o servidor.
+Trabalhar em `develop`, abrir PR para `main` e aguardar os checks antes de integrar. Pages publica somente da `main`.
 
 ```powershell
 .\test.cmd
@@ -39,10 +43,4 @@ node scripts/check-public-repo.js
 node scripts/build-pages.js
 ```
 
-Os testes usam dados fictícios e transporte Meta simulado. A auditoria de publicação bloqueia arquivos privados e padrões conhecidos de segredo, mas não substitui a revisão do diff antes do commit.
-
-## WhatsApp
-
-O padrão é simulação e não envia mensagens reais. A integração compartilhada com o projeto de referência permanece bloqueada até implementar e validar o roteamento aprovado. O adaptador dedicado continua isolado por remetente e contato. Consulte [integração](docs/INTEGRACAO_META.md) e [proposta de roteamento](docs/PROPOSTA_ROTEAMENTO_COMPARTILHADO.md).
-
-Limites: uma instância de servidor; sessões em memória são encerradas em reinício; mídia recebida aparece apenas como indicação; bot automático desligado. As duas contas têm o mesmo acesso à carteira compartilhada. Guardar credenciais e backups privados é responsabilidade operacional do ambiente de hospedagem.
+Os testes usam dados fictícios, armazenamento de teste e transporte Meta simulado. O backend local não exige login; a versão Pages não exige backend, conta ou mensalidade de hospedagem.

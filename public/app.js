@@ -1,3 +1,6 @@
+import { createBrowserApi } from './browser-store.js';
+const browserMode = document.documentElement.dataset.storage === 'browser';
+const browserApi = browserMode ? createBrowserApi() : null;
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = name => name.split(/\s+/).slice(0, 2).map(n => n[0]).join('').toUpperCase();
@@ -7,28 +10,12 @@ const titles = { leads: 'Sua próxima conversa começa aqui.', inbox: 'Conversas
 const statuses = { received: 'Recebida', simulated: 'Simulação local', sending: 'Enviando', accepted: 'Aceita pela Meta', sent: 'Enviada', delivered: 'Entregue', read: 'Lida', failed: 'Falhou', unknown: 'Entrega incerta · confira antes de reenviar' };
 let state = { leads: [], stages: [], metrics: {}, integration: {} }; let csrf = ''; let view = 'leads'; let selectedId = null; let toastTimer; let polling = false;
 const drafts = new Map(); const pendingRequests = new Map(); const sending = new Set();
-let currentUser = null; let authEpoch = 0;
-function lockScreen() {
-  authEpoch++; csrf = ''; currentUser = null; selectedId = null;
-  state = { leads: [], stages: [], metrics: {}, integration: {} };
-  drafts.clear(); pendingRequests.clear(); sending.clear();
-  $('#content').replaceChildren(); $('#crm-main').hidden = true; $('#crm-sidebar').hidden = true;
-  $('#lead-dialog').close(); $('#password-dialog').close(); $('#lead-form').reset();
-  if (!$('#login-dialog').open) $('#login-dialog').showModal();
-}
-async function unlockScreen(result) {
-  csrf = result.csrf; currentUser = result.user; $('#login-dialog').close();
-  $('#account-name').textContent = currentUser.displayName;
-  if (currentUser.mustChangePassword) { $('#password-dialog').showModal(); return; }
-  $('#crm-main').hidden = false; $('#crm-sidebar').hidden = false; await refresh();
-}
 function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 6500); }
 async function api(url, options = {}) {
-  const epoch = authEpoch;
+  if (browserApi) return browserApi(url, options);
   const response = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...options.headers } });
   const data = await response.json();
-  if (epoch !== authEpoch) throw new Error('Sessão encerrada.');
-  if (!response.ok) { if (response.status === 401 && url !== '/api/session') lockScreen(); throw new Error(data.error || 'Não foi possível concluir.'); }
+  if (!response.ok) throw new Error(data.error || 'Não foi possível concluir.');
   return data;
 }
 async function guarded(fn) { try { await fn(); } catch (error) { toast(error.message); } }
@@ -38,7 +25,7 @@ async function refresh(render = true) {
   $('#unread-count').textContent = state.leads.reduce((sum, lead) => sum + lead.unread, 0);
   $('#mode-banner').classList.toggle('blocked', state.integration.mode === 'blocked');
   $('#mode-banner').innerHTML = `<strong>${state.integration.mode === 'simulation' ? '○ SIMULAÇÃO LOCAL' : state.integration.ready ? '● WHATSAPP ATIVO' : '○ ATIVAÇÃO PENDENTE'}</strong> ${escape(state.integration.message)}`;
-  $('#sidebar-status').textContent = state.integration.ready ? 'Operação com número dedicado' : 'Operação isolada';
+  $('#sidebar-status').textContent = browserMode ? 'Salvo neste navegador' : 'Salvo neste computador';
   if (render) renderView();
   else if (view === 'inbox' && $('.conversation-list')) {
     const leads = [...state.leads].sort((a, b) => (b.lastMessage?.created_at || 0) - (a.lastMessage?.created_at || 0));
@@ -56,7 +43,6 @@ function empty(title, description, action = '') { return `<div class="empty"><sp
 function stageOptions(value) { return state.stages.map(stage => `<option ${stage === value ? 'selected' : ''}>${escape(stage)}</option>`).join(''); }
 function stagePill(stage) { return `<span class="pill ${['Interessado', 'Demonstração', 'Negociação', 'Cliente'].includes(stage) ? 'good' : ''}">${escape(stage)}</span>`; }
 function renderView() {
-  if (!currentUser || currentUser.mustChangePassword) return;
   $('#page-title').textContent = titles[view];
   document.querySelectorAll('[data-view]').forEach(b => { b.classList.toggle('active', b.dataset.view === view); b.setAttribute('aria-current', b.dataset.view === view ? 'page' : 'false'); });
   if (view === 'leads') renderLeads();
@@ -66,7 +52,7 @@ function renderView() {
   if (view === 'integration') renderIntegration();
 }
 function renderLeads() {
-  $('#content').innerHTML = `${metricsCards()}<div class="section-heading"><div><h2>Empresas no seu radar</h2><p>Qualifique, conheça e encontre o momento de conversar.</p></div><div class="action-row"><button class="button secondary" data-action="import">Importar JSON</button><button class="button secondary" data-action="export">↓ Exportar</button></div></div>${state.leads.length ? `<div class="toolbar"><input id="search" type="search" placeholder="Buscar empresa, segmento ou cidade…" aria-label="Buscar leads"><select id="stage-filter" aria-label="Filtrar etapa"><option value="">Todas as etapas</option>${stageOptions('')}</select></div><div class="table-wrap"><table><thead><tr><th>EMPRESA</th><th>SEGMENTO</th><th>QUALIFICAÇÃO</th><th>ETAPA</th><th>PRÓXIMO PASSO</th></tr></thead><tbody id="leads-body"></tbody></table></div><p class="import-note">Scores são preliminares. Telefone público não comprova WhatsApp ativo nem autorização para contato. <button class="text-button" data-action="import-context">Importar os 15 leads do documento</button></p>` : empty('Comece com uma base pequena e boa.', 'O documento reúne 15 empresas de Marília para qualificar. Importe essa base ou cadastre seu primeiro lead. Nenhum contato será realizado automaticamente.', '<button class="button primary" data-action="import-context">Importar 15 leads de Marília</button>')}`;
+  $('#content').innerHTML = `${metricsCards()}<div class="section-heading"><div><h2>Empresas no seu radar</h2><p>Qualifique, conheça e encontre o momento de conversar.</p></div><div class="action-row"><button class="button secondary" data-action="import">Importar JSON</button><button class="button secondary" data-action="export">↓ Exportar</button></div></div>${state.leads.length ? `<div class="toolbar"><input id="search" type="search" placeholder="Buscar empresa, segmento ou cidade…" aria-label="Buscar leads"><select id="stage-filter" aria-label="Filtrar etapa"><option value="">Todas as etapas</option>${stageOptions('')}</select></div><div class="table-wrap"><table><thead><tr><th>EMPRESA</th><th>SEGMENTO</th><th>QUALIFICAÇÃO</th><th>ETAPA</th><th>PRÓXIMO PASSO</th></tr></thead><tbody id="leads-body"></tbody></table></div><p class="import-note">Scores são preliminares. Telefone público não comprova WhatsApp ativo nem autorização para contato. </p>` : empty('Comece com uma base pequena e boa.', 'Cadastre seu primeiro lead ou importe um arquivo privado. Os dados ficam neste dispositivo; exporte uma cópia de segurança regularmente.', '<button class="button primary" data-action="import">Importar meus leads</button>')}`;
   if (state.leads.length) { renderLeadRows(); $('#search').addEventListener('input', renderLeadRows); $('#stage-filter').addEventListener('change', renderLeadRows); }
 }
 function renderLeadRows() {
@@ -138,6 +124,7 @@ function renderMetrics() {
   $('#content').innerHTML = `${metricsCards()}<div class="insight-grid"><div class="panel"><h2>Distribuição do pipeline</h2>${m.stages.map(s => `<div class="bar-row"><span>${escape(s.name)}</span><progress max="${Math.max(m.total, 1)}" value="${s.total}" aria-label="${escape(s.name)}"></progress><strong>${s.total}</strong></div>`).join('')}</div><div class="panel"><span class="eyebrow">COMO LER OS RESULTADOS</span><h2>Progresso que pode ser conferido.</h2><p class="muted">A taxa de resposta considera os leads com envio real aceito pela Meta que também têm mensagem real recebida. Simulações não entram nesse cálculo.</p><p class="muted">A conversão por segmento e cidade é a proporção de leads marcados como Cliente sobre o total do grupo. As etapas são atualizadas manualmente.</p><p class="muted">Qualificação A: score 9–10. B: 7–8. C: 0–6. O score é uma hipótese de prioridade, a ser revisada ao conhecer a empresa.</p></div>${table('Conversão por segmento', m.segments)}${table('Conversão por cidade', m.cities)}</div>`;
 }
 function renderIntegration() {
+  if (browserMode) { $('#content').innerHTML = `<div class="panel"><h2>Seu CRM, sem mensalidade.</h2><p class="muted">Os contatos e as conversas desta versão ficam somente neste navegador. Não são enviados ao GitHub e não aparecem automaticamente para seu sócio.</p><h3>Guarde uma cópia</h3><p class="muted">Use Exportar para baixar leads e histórico. Limpar os dados do navegador ou usar navegação anônima pode apagar sua base. Você pode importar o backup em outro dispositivo.</p><h3>WhatsApp em simulação</h3><p class="muted">Esta versão não envia nem recebe mensagens reais da Meta. Nunca insira tokens ou segredos em arquivos do site. A integração existente permanece separada e preservada.</p></div>`; return; }
   $('#content').innerHTML = `<div class="integration-hero"><span class="eyebrow">INTEGRAÇÃO OFICIAL · META CLOUD API</span><h2>Preparado para conectar.<br>Isolado para trabalhar.</h2><p>${escape(state.integration.message)} O CRM guarda seus próprios leads e conversas. A ativação do número compartilhado depende da revisão da proposta de roteamento.</p></div><div class="insight-grid"><div class="panel"><h2>Proposta de roteamento compartilhado</h2><div class="architecture"><span>WhatsApp / Meta</span><b>→</b><span>Roteador por contato</span><b>→</b><span>Prospecta ou Coleus</span></div><div class="steps"><div class="step"><div><h3>Um responsável por conversa</h3><p>A combinação do ID do número e telefone identifica o projeto responsável. Leads de software seguem exclusivamente para este CRM.</p></div></div><div class="step"><div><h3>Conflitos ficam para revisão</h3><p>Se um contato pertencer aos dois projetos, a decisão é humana. Um evento não deve ser entregue aos dois bots.</p></div></div><div class="step"><div><h3>Validação antes da mudança</h3><p>Testar duplicatas, lotes mistos e falhas de entrega; só depois planejar a alteração do callback e a volta à configuração anterior.</p></div></div></div></div><div class="panel"><h2>O que funciona nesta versão</h2><p class="muted">Cadastro e importação JSON, qualificação, tags, observações, pipeline, histórico, indicadores de leitura e simulação de atendimento manual.</p><h3>Conexão real preparada</h3><p class="muted">Webhook com assinatura HMAC, identificação do remetente, deduplicação persistente, estados de entrega e envio manual de texto ou template sem variáveis.</p><h3>Ativação compartilhada pendente</h3><p class="muted">Esta versão bloqueia o número compartilhado. O roteador está documentado para revisão e ainda não foi implantado. Credenciais e callback da Casa dos Coleus não foram alterados.</p><h3>Bot do Prospecta</h3><p class="muted">Desligado. Não há motor de respostas automáticas neste MVP.</p></div></div>`;
 }
 function openLead(id) {
@@ -178,32 +165,14 @@ document.addEventListener('click', event => {
 document.addEventListener('change', event => { if (event.target.dataset.stage) guarded(async () => { try { await api(`/api/leads/${event.target.dataset.stage}`, { method: 'PATCH', body: JSON.stringify({ stage: event.target.value, expectedUpdatedAt: state.leads.find(l => l.id === event.target.dataset.stage)?.updatedAt }) }); toast('Etapa atualizada.'); } finally { await refresh(); } }); });
 $('#import-file').addEventListener('change', event => guarded(async () => {
   const file = event.target.files[0]; if (!file) return;
-  try { if (file.size > 900000) throw new Error('Use um JSON de até 900 KB.'); const data = JSON.parse(await file.text()); const result = await api('/api/leads/import', { method: 'POST', body: JSON.stringify(Array.isArray(data) ? data : data.leads) }); await refresh(); toast(`${result.imported} importados; ${result.skipped} já existentes.`); }
+  try { if (file.size > (browserMode ? 10000000 : 900000)) throw new Error(browserMode ? 'Use um JSON de até 10 MB.' : 'Use um JSON de até 900 KB.'); const data = JSON.parse(await file.text()); const result = await api('/api/leads/import', { method: 'POST', body: JSON.stringify(browserMode ? data : Array.isArray(data) ? data : data.leads) }); await refresh(); toast(`${result.imported} importados; ${result.skipped} já existentes.`); }
   finally { event.target.value = ''; }
 }));
-$('#login-dialog').addEventListener('cancel', event => event.preventDefault());
-$('#login-form').addEventListener('submit', async event => {
-  event.preventDefault(); const button = event.target.querySelector('[type=submit]'); button.disabled = true; $('#login-error').textContent = '';
-  try { const result = await api('/api/session', { method: 'POST', body: JSON.stringify({ username: $('#login-username').value, password: $('#login-password').value }) }); $('#login-password').value = ''; await unlockScreen(result); }
-  catch (error) { $('#login-error').textContent = error.message; } finally { button.disabled = false; }
-});
-$('#logout').addEventListener('click', () => guarded(async () => { await api('/api/session', { method: 'DELETE' }); lockScreen(); }));
-$('#change-password').addEventListener('click', () => { $('#password-description').textContent = 'Atualize a senha usada para entrar na sua conta.'; $('#password-dialog').showModal(); });
-$('#password-dialog').addEventListener('cancel', event => { if (currentUser?.mustChangePassword) event.preventDefault(); });
-$('#password-cancel').addEventListener('click', () => { if (currentUser?.mustChangePassword) $('#logout').click(); else $('#password-dialog').close(); });
-$('#password-form').addEventListener('submit', async event => {
-  event.preventDefault(); const button = event.target.querySelector('[type=submit]'); button.disabled = true; $('#password-error').textContent = '';
-  try {
-    if ($('#new-password').value !== $('#confirm-password').value) throw new Error('A confirmação deve ser igual à nova senha.');
-    const result = await api('/api/account/password', { method: 'POST', body: JSON.stringify({ currentPassword: $('#current-password').value, newPassword: $('#new-password').value }) });
-    event.target.reset(); $('#password-dialog').close(); await unlockScreen(result); toast('Senha atualizada. As outras sessões desta conta foram encerradas.');
-  } catch (error) { $('#password-error').textContent = error.message; } finally { button.disabled = false; }
-});
 window.addEventListener('hashchange', () => { view = Object.hasOwn(titles, location.hash.slice(1)) ? location.hash.slice(1) : 'leads'; renderView(); });
 view = Object.hasOwn(titles, location.hash.slice(1)) ? location.hash.slice(1) : 'leads';
-(async () => { try { await unlockScreen(await api('/api/session')); } catch { lockScreen(); } })();
+guarded(async () => { csrf = (await api('/api/session')).csrf; $('#crm-main').hidden = false; $('#crm-sidebar').hidden = false; await refresh(); });
 setInterval(() => {
-  if (view !== 'inbox' || document.hidden || polling || !selectedId || !csrf || $('#lead-dialog').open || $('#login-dialog').open) return;
+  if (view !== 'inbox' || document.hidden || polling || !selectedId || !csrf || $('#lead-dialog').open) return;
   polling = true;
   guarded(async () => { try { await loadMessages(); await refresh(false); } finally { polling = false; } });
 }, 5000);
