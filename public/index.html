@@ -34,6 +34,19 @@
     <label>Observações internas<textarea name="notes" rows="3" maxlength="5000" placeholder="O que vale lembrar antes da próxima conversa?"></textarea></label>
     <fieldset><legend>Preferências de contato</legend><label class="check"><input name="optIn" type="checkbox"> Tenho autorização registrada para contato por WhatsApp</label><label>Evidência da autorização<input name="optInEvidence" maxlength="500" placeholder="Data e canal em que o contato autorizou"></label><label class="check"><input name="doNotContact" type="checkbox"> Não contatar este lead</label></fieldset>
     <div class="dialog-actions"><span>Atendimento manual · bot desligado</span><button class="button primary" type="submit">Salvar lead</button></div></form></dialog>
+  <dialog id="search-leads-dialog" aria-labelledby="search-leads-title">
+    <div class="dialog-heading"><div><span class="eyebrow">PROSPECÇÃO DE SOFTWARE DE ESTOQUE</span><h2 id="search-leads-title">Buscar leads</h2></div><button id="close-search-leads" type="button" class="icon-button" aria-label="Fechar busca">×</button></div>
+    <p class="muted">Busque e importe até 50 empresas por vez. Telefones já cadastrados são preservados; novos leads entram com qualificação pendente.</p>
+    <form id="search-leads-form">
+      <fieldset><legend>Onde e o que buscar</legend>
+        <div class="form-grid"><label>Cidade da busca<input name="city" value="Marília" required minlength="2" maxlength="80" autocomplete="off"></label><label>UF da busca<select name="state"></select></label></div>
+        <div id="search-segments" class="search-segments"></div>
+      </fieldset>
+      <p class="muted search-source">Fonte: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© colaboradores do OpenStreetMap · ODbL</a>, via Private.coffee, com municípios do IBGE. Cobertura parcial: pode não encontrar todos os negócios. A consulta envia somente cidade, UF e segmentos; sua carteira e suas notas não são enviadas.</p>
+      <p id="search-leads-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions"><span>Sem envio de WhatsApp</span><button class="button primary" type="submit">Buscar e importar</button></div>
+    </form>
+  </dialog>
   <input id="import-file" type="file" accept=".json,application/json" hidden>
 </body>
 </html>

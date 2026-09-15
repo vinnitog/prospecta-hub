@@ -1,4 +1,5 @@
 import { createBrowserApi } from './browser-store.js';
+import { setupLeadSearch } from './lead-search-ui.js';
 const browserMode = document.documentElement.dataset.storage === 'browser';
 const browserApi = browserMode ? createBrowserApi() : null;
 const $ = selector => document.querySelector(selector);
@@ -52,7 +53,7 @@ function renderView() {
   if (view === 'integration') renderIntegration();
 }
 function renderLeads() {
-  $('#content').innerHTML = `${metricsCards()}<div class="section-heading"><div><h2>Empresas no seu radar</h2><p>Qualifique, conheça e encontre o momento de conversar.</p></div><div class="action-row"><button class="button secondary" data-action="import">Importar JSON</button><button class="button secondary" data-action="export">↓ Exportar</button></div></div>${state.leads.length ? `<div class="toolbar"><input id="search" type="search" placeholder="Buscar empresa, segmento ou cidade…" aria-label="Buscar leads"><select id="stage-filter" aria-label="Filtrar etapa"><option value="">Todas as etapas</option>${stageOptions('')}</select></div><div class="table-wrap"><table><thead><tr><th>EMPRESA</th><th>SEGMENTO</th><th>QUALIFICAÇÃO</th><th>ETAPA</th><th>PRÓXIMO PASSO</th></tr></thead><tbody id="leads-body"></tbody></table></div><p class="import-note">Scores são preliminares. Telefone público não comprova WhatsApp ativo nem autorização para contato. </p>` : empty('Comece com uma base pequena e boa.', 'Cadastre seu primeiro lead ou importe um arquivo privado. Os dados ficam neste dispositivo; exporte uma cópia de segurança regularmente.', '<button class="button primary" data-action="import">Importar meus leads</button>')}`;
+  $('#content').innerHTML = `${metricsCards()}<div class="section-heading"><div><h2>Empresas no seu radar</h2><p>Qualifique, conheça e encontre o momento de conversar.</p></div><div class="action-row"><button class="button primary" data-action="search-leads">Buscar leads</button><button class="button secondary" data-action="import">Importar JSON</button><button class="button secondary" data-action="export">↓ Exportar</button></div></div>${state.leads.length ? `<div class="toolbar"><input id="search" type="search" placeholder="Buscar empresa, segmento ou cidade…" aria-label="Buscar leads"><select id="stage-filter" aria-label="Filtrar etapa"><option value="">Todas as etapas</option>${stageOptions('')}</select></div><div class="table-wrap"><table><thead><tr><th>EMPRESA</th><th>SEGMENTO</th><th>QUALIFICAÇÃO</th><th>ETAPA</th><th>PRÓXIMO PASSO</th></tr></thead><tbody id="leads-body"></tbody></table></div><p class="import-note">Scores são preliminares. Telefone público não comprova WhatsApp ativo nem autorização para contato. </p>` : empty('Comece com uma base pequena e boa.', 'Cadastre seu primeiro lead ou importe um arquivo privado. Os dados ficam neste dispositivo; exporte uma cópia de segurança regularmente.', '<button class="button primary" data-action="import">Importar meus leads</button>')}`;
   if (state.leads.length) { renderLeadRows(); $('#search').addEventListener('input', renderLeadRows); $('#stage-filter').addEventListener('change', renderLeadRows); }
 }
 function renderLeadRows() {
@@ -170,6 +171,7 @@ $('#import-file').addEventListener('change', event => guarded(async () => {
 }));
 window.addEventListener('hashchange', () => { view = Object.hasOwn(titles, location.hash.slice(1)) ? location.hash.slice(1) : 'leads'; renderView(); });
 view = Object.hasOwn(titles, location.hash.slice(1)) ? location.hash.slice(1) : 'leads';
+setupLeadSearch(api, refresh);
 guarded(async () => { csrf = (await api('/api/session')).csrf; $('#crm-main').hidden = false; $('#crm-sidebar').hidden = false; await refresh(); });
 setInterval(() => {
   if (view !== 'inbox' || document.hidden || polling || !selectedId || !csrf || $('#lead-dialog').open) return;

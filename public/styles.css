@@ -1117,6 +1117,10 @@ h1 { font-size: 30px; }
   h1 { font-size: 27px; }
   .inbox { grid-template-columns: 230px minmax(0,1fr); }
 }
+.search-segments { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin-top: 18px; }
+.search-source { font-size: 14px; line-height: 1.6; }
+#search-leads-status { line-height: 1.6; font-weight: 600; }
+.dialog-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 @media (max-width: 570px) {
   .inbox { display: flex; min-height: 0; }
   .thread { height: 690px; }

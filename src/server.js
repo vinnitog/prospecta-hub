@@ -8,10 +8,10 @@ import { Store, STAGES, problem } from './store.js';
 import { integrationStatus, receiveWebhook, safeEqual, sendMessage, verifyMetaSignature } from './whatsapp.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const assets = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']], ['/domain.js', ['domain.js', 'text/javascript']], ['/browser-store.js', ['browser-store.js', 'text/javascript']]]);
+const assets = new Map([['/', ['index.html', 'text/html']], ['/app.js', ['app.js', 'text/javascript']], ['/styles.css', ['styles.css', 'text/css']], ['/domain.js', ['domain.js', 'text/javascript']], ['/lead-search.js', ['lead-search.js', 'text/javascript']], ['/lead-search-ui.js', ['lead-search-ui.js', 'text/javascript']], ['/browser-store.js', ['browser-store.js', 'text/javascript']]]);
 const security = {
   'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://overpass.private.coffee/api/interpreter https://servicodados.ibge.gov.br/api/v1/localidades/estados/; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
 };
 async function readBody(req, max = 1000000) {
   if (!String(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) throw problem('Envie JSON.', 415);
