@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+data/
+private/
+backups/
+*.sqlite*
+*.db*
+*export*.json
+node_modules/
+output/
+*.log

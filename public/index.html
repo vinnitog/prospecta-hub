@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#153c35">
+  <title>Prospecta Hub · Relacionamentos que avançam</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar" id="crm-sidebar" hidden>
+    <a class="brand" href="/#leads"><span class="brand-mark">p.</span><span>prospecta<span class="brand-sub">SEU PRÓXIMO CLIENTE</span></span></a>
+    <div class="workspace-label">ESPAÇO DE TRABALHO</div>
+    <div class="workspace"><span class="workspace-icon">E</span><div>Software de estoque<small>Prospecção · Marília, SP</small></div></div>
+    <nav aria-label="Navegação principal">
+      <button data-view="leads"><span>◫</span> Leads <small id="lead-count">0</small></button>
+      <button data-view="inbox"><span>▤</span> Caixa de entrada <small id="unread-count">0</small></button>
+      <button data-view="pipeline"><span>▥</span> Pipeline</button>
+      <button data-view="metrics"><span>↗</span> Resultados</button>
+      <button data-view="integration"><span>⊙</span> Integração</button>
+    </nav>
+    <div class="sidebar-bottom"><span id="account-name"></span><div class="account-actions"><button id="change-password" class="text-button">Minha senha</button><button id="logout" class="text-button">Sair</button></div><span class="status-dot"></span><span id="sidebar-status">Ambiente local</span></div>
+  </aside>
+  <main id="crm-main" hidden>
+    <header class="topbar"><div><span class="eyebrow">PROSPECÇÃO COM CONTEXTO</span><h1 id="page-title">Sua próxima conversa começa aqui.</h1></div><div class="top-actions"><button id="refresh" class="button secondary">↻ Atualizar</button><button id="new-lead" class="button primary">+ Novo lead</button></div></header>
+    <div id="mode-banner" class="mode-banner" role="status">Carregando o ambiente…</div>
+    <section id="content" aria-label="Conteúdo principal"></section>
+    <footer>Prospecta Hub <span>Software de estoque · Windows · Offline</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <dialog id="lead-dialog"><form id="lead-form"><div class="dialog-title"><div><span class="eyebrow">RELACIONAMENTO</span><h2 id="lead-form-title">Novo lead</h2></div><button type="button" class="icon-button" id="close-dialog" aria-label="Fechar">×</button></div><input name="id" type="hidden">
+    <div class="form-grid"><label>Empresa<input name="company" required maxlength="160" placeholder="Nome da empresa"></label><label>Telefone com DDI<input name="phone" required maxlength="25" placeholder="55 14 99999-9999" inputmode="tel"></label><label>Segmento<input name="segment" maxlength="100" placeholder="Ex.: Ferramentas"></label><label>Cidade<input name="city" maxlength="100" value="Marília"></label><label>Origem<input name="source" maxlength="160" value="Cadastro manual"></label><label>Score de qualificação (0–10)<input name="score" type="number" min="0" max="10" value="5" required></label><label>Etapa comercial<select name="stage" id="form-stage"></select></label><label>Tags, separadas por vírgula<input name="tags" maxlength="490" placeholder="Windows, estoque físico"></label></div>
+    <label>Observações internas<textarea name="notes" rows="3" maxlength="5000" placeholder="O que vale lembrar antes da próxima conversa?"></textarea></label>
+    <fieldset><legend>Preferências de contato</legend><label class="check"><input name="optIn" type="checkbox"> Tenho autorização registrada para contato por WhatsApp</label><label>Evidência da autorização<input name="optInEvidence" maxlength="500" placeholder="Data e canal em que o contato autorizou"></label><label class="check"><input name="doNotContact" type="checkbox"> Não contatar este lead</label></fieldset>
+    <div class="dialog-actions"><span>Atendimento manual · bot desligado</span><button class="button primary" type="submit">Salvar lead</button></div></form></dialog>
+  <dialog id="login-dialog" aria-labelledby="login-title"><form id="login-form"><span class="brand-mark">p.</span><span class="eyebrow">PROSPECTA HUB · ACESSO PRIVADO</span><h2 id="login-title">Entre no seu espaço.</h2><p class="muted">Seus contatos e conversas, em um só lugar.</p><label>Usuário<input id="login-username" required autocomplete="username" maxlength="40" autocapitalize="none" spellcheck="false"></label><label>Senha<input id="login-password" type="password" required autocomplete="current-password" maxlength="128"></label><p id="login-error" class="form-error" role="alert"></p><button class="button primary" type="submit">Entrar</button></form></dialog>
+  <dialog id="password-dialog" aria-labelledby="password-title"><form id="password-form"><span class="eyebrow">SUA CONTA</span><h2 id="password-title">Defina sua senha pessoal.</h2><p class="muted" id="password-description">Troque a senha inicial antes de acessar o CRM.</p><label>Senha atual<input id="current-password" type="password" required autocomplete="current-password" maxlength="128"></label><label>Nova senha<input id="new-password" type="password" required autocomplete="new-password" minlength="12" maxlength="128"></label><label>Confirme a nova senha<input id="confirm-password" type="password" required autocomplete="new-password" minlength="12" maxlength="128"></label><p class="muted">Use pelo menos 12 caracteres.</p><p id="password-error" class="form-error" role="alert"></p><div class="action-row"><button id="password-cancel" class="button secondary" type="button">Voltar</button><button class="button primary" type="submit">Salvar minha senha</button></div></form></dialog>
+  <input id="import-file" type="file" accept=".json,application/json" hidden>
+</body>
+</html>
