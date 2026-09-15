@@ -3,34 +3,8 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-export const STAGES = ['Não contatado', 'Mensagem enviada', 'Respondeu', 'Interessado', 'Demonstração', 'Negociação', 'Cliente', 'Sem interesse'];
-export function problem(message, status = 400) { return Object.assign(new Error(message), { status }); }
-export function phone(value) {
-  if (typeof value !== 'string' || !/^[+\d\s().-]+$/.test(value)) throw problem('Telefone inválido. Informe DDI + DDD + número.');
-  const digits = value.replace(/\D/g, '');
-  if (!/^[1-9]\d{7,14}$/.test(digits)) throw problem('Telefone inválido. Informe DDI + DDD + número.');
-  return digits;
-}
-function string(value, name, max, required = false) {
-  if (typeof value !== 'string' || value.length > max || (required && !value.trim())) throw problem(`${name} inválido.`);
-  return value.trim();
-}
-function validateLead(input, existing = {}) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw problem('Lead inválido.');
-  const data = { company: '', phone: '', segment: '', city: '', source: 'Cadastro manual', score: 5, stage: STAGES[0], tags: [], notes: '', optIn: false, optInEvidence: '', doNotContact: false, ...existing, ...input };
-  const result = {};
-  for (const [key, max] of Object.entries({ company: 160, segment: 100, city: 100, source: 160, notes: 5000, optInEvidence: 500 })) {
-    result[key] = string(data[key], key, max, key === 'company');
-  }
-  result.phone = phone(data.phone);
-  if (existing.phone && result.phone !== existing.phone) throw problem('O telefone não pode ser alterado após o cadastro, para preservar a identidade da conversa.');
-  if (!Number.isInteger(data.score) || data.score < 0 || data.score > 10) throw problem('Score deve ser um inteiro de 0 a 10.');
-  if (!STAGES.includes(data.stage)) throw problem('Etapa comercial inválida.');
-  if (!Array.isArray(data.tags) || data.tags.length > 12 || data.tags.some(t => typeof t !== 'string' || t.length > 40)) throw problem('Use até 12 tags de 40 caracteres.');
-  if (typeof data.optIn !== 'boolean' || typeof data.doNotContact !== 'boolean') throw problem('Preferência de contato inválida.');
-  if (data.optIn && !result.optInEvidence) throw problem('Registre a evidência da autorização para contato.');
-  return { ...result, score: data.score, stage: data.stage, tags: [...new Set(data.tags.map(t => t.trim()).filter(Boolean))], optIn: data.optIn, doNotContact: data.doNotContact, botActive: false };
-}
+import { STAGES, problem, phone, validateLead } from '../public/domain.js';
+export { STAGES, problem, phone };
 
 export class Store {
   constructor(file = ':memory:') {
@@ -48,16 +22,6 @@ export class Store {
     this.db.prepare("UPDATE messages SET status='unknown' WHERE status='sending'").run();
   }
   close() { this.db.close(); }
-  user(username) { return this.db.prepare('SELECT * FROM users WHERE username=?').get(username); }
-  userById(id) { return this.db.prepare('SELECT * FROM users WHERE id=?').get(id); }
-  createUser(username, displayName, passwordHash) {
-    if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw problem('Usuário deve ter 3–40 letras minúsculas, números, ponto, hífen ou sublinhado.');
-    if (this.user(username)) throw problem('Usuário já existe.', 409);
-    this.db.prepare('INSERT INTO users(id,username,display_name,password_hash) VALUES(?,?,?,?)').run(randomUUID(), username, displayName, passwordHash);
-    return this.user(username);
-  }
-  changePassword(id, hash) { this.db.prepare('UPDATE users SET password_hash=?,must_change_password=0,password_version=password_version+1 WHERE id=?').run(hash, id); }
-  audit(userId, action, resourceId = null) { this.db.prepare('INSERT INTO audit_events VALUES(?,?,?,?,?)').run(randomUUID(), userId, action, resourceId, Date.now()); }
   transaction(fn) {
     this.db.exec('BEGIN IMMEDIATE');
     try { const result = fn(); this.db.exec('COMMIT'); return result; }

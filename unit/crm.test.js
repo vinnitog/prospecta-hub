@@ -6,9 +6,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { Store } from '../src/store.js';
-import { hashPassword } from '../src/auth.js';
-const testPassword = 'senha-ficticia-de-qa-123';
-const testHash = await hashPassword(testPassword);
 import { readConfig } from '../src/config.js';
 import { createApp } from '../src/server.js';
 import { receiveWebhook, sendMessage, verifyMetaSignature, integrationStatus } from '../src/whatsapp.js';
@@ -148,20 +145,20 @@ test('banco persiste leads, mensagens e deduplicação após reinício', () => {
   } finally { store?.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 test('configuração recusa exposição em rede sem autenticação e HTTPS', () => {
-  assert.throws(() => readConfig({ HOST: '0.0.0.0' }), /Acesso em rede/);
-  assert.equal(readConfig({ PROSPECTA_ORIGIN: 'https://crm.example.com' }).origin, 'https://crm.example.com');
+  assert.throws(() => readConfig({ HOST: '0.0.0.0' }), /Sem login/);
+  assert.throws(() => readConfig({ PROSPECTA_ORIGIN: 'https://crm.example.com' }), /Sem login/);
   assert.throws(() => readConfig({ PROSPECTA_ORIGIN: 'http://localhost:4317/' }), /origem/);
   assert.equal(readConfig({}).whatsapp.mode, 'simulation');
 });
 
 async function httpSetup(t, whatsapp = { mode: 'simulation' }, extra = {}) {
   const store = new Store(); const config = { host: '127.0.0.1', port: 0, origin: 'http://127.0.0.1:1', contextPath: path.join(tmpdir(), 'prospecta-contexto-inexistente-qa.json'), whatsapp, ...extra };
-  for (const name of ['owner-qa', 'partner-qa']) { const user = store.createUser(name, name, testHash); if (!extra.mustChangePassword) store.changePassword(user.id, testHash); }
+
   const app = createApp(config, { store, fetchImpl: () => { throw new Error('Rede Meta proibida'); } });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   config.origin = `http://127.0.0.1:${app.server.address().port}`;
   t.after(async () => { await new Promise(resolve => app.server.close(resolve)); store.close(); });
-  const response = await fetch(config.origin + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'owner-qa', password: testPassword }) }); const auth = await response.json(); const cookie = response.headers.get('set-cookie')?.split(';')[0];
+  const response = await fetch(config.origin + '/api/session'); const auth = await response.json(); const cookie = response.headers.get('set-cookie')?.split(';')[0];
   const request = (route, options = {}) => fetch(config.origin + route, { ...options, headers: { Cookie: cookie || '', 'Content-Type': 'application/json', 'X-CSRF-Token': auth.csrf || '', ...options.headers } });
   return { ...app, config, auth, request };
 }
@@ -199,37 +196,13 @@ test('HTTP webhook fecha simulação e exige assinatura no ambiente dedicado', a
   assert.equal((await request('/api/whatsapp/webhook', { method: 'POST', body, headers: { 'x-hub-signature-256': signature } })).status, 200);
   assert.equal(store.messages(store.list()[0].id).length, 1);
 });
-test('duas contas, autenticação obrigatória e logout com revogação', async t => {
+test('acesso local abre sem login e antigas rotas de senha são desativadas', async t => {
   const { config, request } = await httpSetup(t);
-  for (const route of ['/api/session', '/api/state', '/api/export']) assert.equal((await fetch(config.origin + route)).status, 401);
-  const login = await fetch(config.origin + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'partner-qa', password: testPassword }) });
-  const partner = await login.json(); assert.equal(partner.user.username, 'partner-qa');
-  assert.ok(!JSON.stringify(partner).includes(testPassword)); assert.ok(!JSON.stringify(partner).includes('password_hash'));
-  const cookie = login.headers.get('set-cookie').split(';')[0]; assert.match(cookie, /prospecta_session=/);
-  assert.match(login.headers.get('set-cookie'), /HttpOnly/);
-  assert.equal((await request('/api/session', { method: 'DELETE' })).status, 200);
-  assert.equal((await request('/api/state')).status, 401);
-  assert.equal((await fetch(config.origin + '/api/state', { headers: { Cookie: cookie } })).status, 200);
-});
-
-test('senha inicial bloqueia dados até troca e a senha antiga deixa de autenticar', async t => {
-  const { config, request, auth } = await httpSetup(t, { mode: 'simulation' }, { mustChangePassword: true });
-  assert.equal(auth.user.mustChangePassword, true);
-  assert.equal((await request('/api/state')).status, 403);
-  assert.equal((await request('/api/export')).status, 403);
-  const changed = await request('/api/account/password', { method: 'POST', body: JSON.stringify({ currentPassword: testPassword, newPassword: 'nova-senha-ficticia-456' }) });
-  assert.equal(changed.status, 200); assert.equal((await changed.json()).user.mustChangePassword, false);
-  assert.equal((await request('/api/state')).status, 401);
-  const oldLogin = await fetch(config.origin + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'owner-qa', password: testPassword }) });
-  assert.equal(oldLogin.status, 401);
-});
-
-test('tentativas incorretas são limitadas e login antigo por token não funciona', async t => {
-  const { config } = await httpSetup(t);
-  const login = body => fetch(config.origin + '/api/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  assert.equal((await login({ token: 'qualquer-token' })).status, 401);
-  for (let i = 0; i < 9; i++) assert.equal((await login({ username: 'owner-qa', password: 'errada' })).status, 401);
-  assert.equal((await login({ username: 'owner-qa', password: testPassword })).status, 429);
+  const session = await fetch(config.origin + '/api/session');
+  assert.equal(session.status, 200); assert.ok((await session.json()).csrf);
+  assert.equal((await request('/api/state')).status, 200);
+  assert.equal((await request('/api/account/password', {method:'POST',body:'{}'})).status, 404);
+  assert.equal((await request('/api/session', {method:'POST',body:'{}'})).status, 405);
 });
 
 test('edição concorrente rejeita revisão antiga sem sobrescrever o sócio', t => {

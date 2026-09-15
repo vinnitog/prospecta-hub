@@ -1,15 +1,10 @@
-import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, copyFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 const output = path.resolve('output/pages'); mkdirSync(output, { recursive: true });
-let html = readFileSync('pages/index.html', 'utf8');
-const value = process.env.CRM_PUBLIC_URL || '';
-if (value) {
-  const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('CRM_PUBLIC_URL deve ser uma URL HTTPS sem credenciais, query ou fragmento.');
-  const escaped = url.href.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  html = html.replace(/<!-- CRM_ACCESS -->[\s\S]*?<!-- \/CRM_ACCESS -->/, `<a href="${escaped}" rel="noreferrer">Entrar no CRM →</a><p>Use seu usuário e senha individuais para acessar o espaço da equipe.</p>`);
-}
-// Lista explícita: jamais copiar public/, data/, private/ ou a raiz do repositório.
+const allowed = ['index.html', 'styles.css', 'app.js', 'browser-store.js', 'domain.js'];
+if (readdirSync(output).some(name => !allowed.includes(name))) throw new Error('Artefato contém arquivo inesperado; revise output/pages antes de publicar.');
+const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">`;
+const html = readFileSync('public/index.html', 'utf8').replace('<html lang="pt-BR">', '<html lang="pt-BR" data-storage="browser">').replace('<head>', `<head>\n  ${policy}`).replace('href="/#leads"', 'href="#leads"');
 writeFileSync(path.join(output, 'index.html'), html);
-copyFileSync('pages/styles.css', path.join(output, 'styles.css'));
-console.log('Portal público gerado: somente index.html e styles.css.');
+for (const file of allowed.filter(name => name !== 'index.html')) copyFileSync(path.join('public', file), path.join(output, file));
+console.log('CRM estático gerado com dados locais: cinco arquivos públicos, nenhuma base ou credencial.');

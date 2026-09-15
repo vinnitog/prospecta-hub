@@ -8,8 +8,8 @@ export function readConfig(env = process.env) {
   const parsed = new URL(origin);
   if (parsed.origin !== origin) throw new Error('PROSPECTA_ORIGIN deve conter somente a origem, sem barra final.');
   const localOnly = host === '127.0.0.1' && parsed.hostname === '127.0.0.1' && parsed.protocol === 'http:';
-  if (!localOnly && parsed.protocol !== 'https:') {
-    throw new Error('Acesso em rede exige origem HTTPS.');
+  if (!localOnly) {
+    throw new Error('Sem login, o servidor deve usar HOST=127.0.0.1 e origem HTTP em 127.0.0.1.');
   }
   return {
     host, port, origin,

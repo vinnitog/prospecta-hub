@@ -21,8 +21,6 @@ jobs:
       - run: npm run check
       - run: node scripts/check-public-repo.js
       - run: node scripts/build-pages.js
-        env:
-          CRM_PUBLIC_URL: ${{ vars.CRM_PUBLIC_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: output/pages
